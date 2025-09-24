@@ -17,6 +17,10 @@ class Game {
         this.opponentShots = []; // Disparos del oponente
         this.xDown = null; //  Posición en la que el usuario ha tocado la pantalla
         this.paused = false; // Indica si el juego está pausado
+        this.score = 0; // Puntuación del juego
+        this.lives = 3; // Vidas del jugador
+        this.boss = undefined; //Jefe del juego
+        this.level = 0; // Nivel del juego
     }
 
     /**
@@ -38,9 +42,11 @@ class Game {
             this.started = true;
             this.width = window.innerWidth;
             this.height = window.innerHeight;
-
             this.player = new Player(this);
+            this.opponent = new Opponent(this);
             this.timer = setInterval(() => this.update(), 50);
+            this.updateHUD();
+
         }
     }
 
@@ -88,8 +94,9 @@ class Game {
     removeOpponent () {
         if (this.opponent) {
             document.body.removeChild(this.opponent.image);
+            this.opponent = null;
         }
-        this.opponent = new Opponent(this);
+
     }
 
     /**
@@ -169,6 +176,11 @@ class Game {
         }
         if (impact || this.hasCollision(this.player, this.opponent)) {
             this.player.collide();
+            this.lives--;
+            this.updateHUD();
+            if (this.lives === 0) {
+                this.endGame();
+            }
         }
         let killed = false;
 
@@ -177,8 +189,30 @@ class Game {
         }
         if (killed) {
             this.opponent.collide();
+            this.score += 100;
+            this.updateHUD();
+            this.level++;
+            this.removeOpponent();
+            if (this.level % 5 === 0) { // Cada 5 niveles aparece un jefe
+                this.boss = new Boss(this);
+            } else {
+                this.opponent = new Opponent(this);
+            }
+        }
+         if (this.boss) {
+            let bossKilled = false;
+            for (let i = 0; i < this.playerShots.length; i++) {
+                bossKilled = bossKilled || this.hasCollision(this.boss, this.playerShots[i]);
+            }
+            if (bossKilled) {
+                this.boss.collide();
+                this.score += 500;
+                this.updateHUD();
+                this.winGame();
+            }
         }
     }
+
 
     /**
      * Comprueba si dos elementos del juego se están chocando
@@ -209,6 +243,17 @@ class Game {
         this.ended = true;
         let gameOver = new Entity(this, this.width / 2, "auto", this.width / 4, this.height / 4, 0, GAME_OVER_PICTURE)
         gameOver.render();
+        clearInterval(this.timer);
+    }
+
+    /**
+    * Gana el juego
+    */
+    winGame() {
+        this.ended = true;
+        let youWin = new Entity(this, this.width / 2, "auto", this.width / 4, this.height / 4, 0, YOU_WIN_PICTURE);
+        youWin.render();
+        clearInterval(this.timer);
     }
 
     /**
@@ -217,6 +262,15 @@ class Game {
      resetGame () {
        document.location.reload();
      }
+    /**
+     * Actualiza el HUD
+     */
+    updateHUD () {
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        scoreElement.innerText = `Score: ${this.score}`;
+        livesElement.innerText = `Lives: ${this.lives}`;
+    }
 
     /**
      * Actualiza los elementos del juego
@@ -224,10 +278,12 @@ class Game {
     update () {
         if (!this.ended) {
             this.player.update();
-            if (this.opponent === undefined) {
-                this.opponent = new Opponent(this);
+            if (this.opponent) {
+                this.opponent.update();
             }
-            this.opponent.update();
+             if (this.boss) {
+                this.boss.update();
+            }
             this.playerShots.forEach((shot) => {
                 shot.update();
             });
@@ -244,8 +300,11 @@ class Game {
      */
     render () {
         this.player.render();
-        if (this.opponent !== undefined) {
+        if (this.opponent) {
             this.opponent.render();
+        }
+        if (this.boss) {
+            this.boss.render();
         }
         this.playerShots.forEach((shot) => {
             shot.render();
